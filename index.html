@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Stopwatch</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #1e293b;
+      border-radius: 24px;
+      padding: 28px 22px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 18px;
+    }
+    .display {
+      font-size: clamp(2.6rem, 11vw, 3.6rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      padding: 18px 10px;
+      margin-bottom: 22px;
+      background: #0f172a;
+      border-radius: 16px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 15px 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #startBtn { background: #22c55e; color: #052e16; }
+    #startBtn.running { background: #f59e0b; color: #451a03; }
+    #lapBtn { background: #3b82f6; color: #eff6ff; }
+    #resetBtn { background: #ef4444; color: #fef2f2; }
+    .laps {
+      list-style: none;
+      max-height: 210px;
+      overflow-y: auto;
+      text-align: left;
+    }
+    .laps li {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #334155;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95rem;
+    }
+    .laps li span:first-child { color: #94a3b8; }
+    .laps li .split { color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Stopwatch</h1>
+    <div class="display" id="display">00:00.00</div>
+    <div class="controls">
+      <button id="startBtn">Start</button>
+      <button id="lapBtn" disabled>Lap</button>
+      <button id="resetBtn" disabled>Reset</button>
+    </div>
+    <ul class="laps" id="laps"></ul>
+  </main>
+
+  <script>
+    const display = document.getElementById("display");
+    const startBtn = document.getElementById("startBtn");
+    const lapBtn = document.getElementById("lapBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const lapsList = document.getElementById("laps");
+
+    let startTime = 0;
+    let elapsedTime = 0;
+    let lastLapTime = 0;
+    let lapCount = 0;
+    let running = false;
+    let rafId = null;
+
+    function formatTime(ms) {
+      const hours = Math.floor(ms / 3600000);
+      const minutes = Math.floor((ms % 3600000) / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      const centis = Math.floor((ms % 1000) / 10);
+      const pad = (n) => String(n).padStart(2, "0");
+      return hours > 0
+        ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(centis)}`
+        : `${pad(minutes)}:${pad(seconds)}.${pad(centis)}`;
+    }
+
+    function update() {
+      if (!running) return;
+      elapsedTime = Date.now() - startTime;
+      display.textContent = formatTime(elapsedTime);
+      rafId = requestAnimationFrame(update);
+    }
+
+    startBtn.addEventListener("click", () => {
+      if (!running) {
+        startTime = Date.now() - elapsedTime;
+        running = true;
+        startBtn.textContent = "Pause";
+        startBtn.classList.add("running");
+        lapBtn.disabled = false;
+        resetBtn.disabled = false;
+        rafId = requestAnimationFrame(update);
+      } else {
+        running = false;
+        cancelAnimationFrame(rafId);
+        elapsedTime = Date.now() - startTime;
+        display.textContent = formatTime(elapsedTime);
+        startBtn.textContent = "Resume";
+        startBtn.classList.remove("running");
+        lapBtn.disabled = true;
+      }
+    });
+
+    lapBtn.addEventListener("click", () => {
+      if (!running) return;
+      lapCount += 1;
+      const split = elapsedTime - lastLapTime;
+      lastLapTime = elapsedTime;
+
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span>Lap ${lapCount}</span>
+        <span class="split">+${formatTime(split)}</span>
+        <span>${formatTime(elapsedTime)}</span>
+      `;
+      lapsList.prepend(li);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      running = false;
+      cancelAnimationFrame(rafId);
+      elapsedTime = 0;
+      lastLapTime = 0;
+      lapCount = 0;
+      display.textContent = "00:00.00";
+      lapsList.innerHTML = "";
+      startBtn.textContent = "Start";
+      startBtn.classList.remove("running");
+      lapBtn.disabled = true;
+      resetBtn.disabled = true;
+    });
+  </script>
+</body>
+</html>
